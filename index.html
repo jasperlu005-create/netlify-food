@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>今天吃什麼</title>
+<meta name="theme-color" content="#f5f5f5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="今天吃什麼">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='%231a1a1a'/><text y='360' x='80' font-size='320'>🍜</text></svg>">
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;今天吃什麼&quot;,&quot;short_name&quot;:&quot;吃什麼&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%23f5f5f5&quot;,&quot;theme_color&quot;:&quot;%231a1a1a&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='%231a1a1a'/><text y='360' x='80' font-size='320'>🍜</text></svg>&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/svg+xml&quot;}]}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%231a1a1a'/><text y='.9em' font-size='72' x='12'>🍜</text></svg>">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue','Noto Sans TC',sans-serif;background:#f5f5f5;color:#1a1a1a;display:flex;justify-content:center}
+.app{width:100%;max-width:430px;min-height:100%;display:flex;flex-direction:column;background:#f5f5f5}
+
+/* 定位遮罩 */
+.loc-overlay{position:fixed;inset:0;background:#f5f5f5;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .5s}
+.loc-overlay.out{opacity:0;pointer-events:none}
+.loc-title{font-size:16px;font-weight:600;color:#1a1a1a}
+.loc-sub{font-size:13px;color:#999;text-align:center;line-height:1.7;padding:0 40px}
+.loc-ring{width:32px;height:32px;border:2px solid #e0e0e0;border-top-color:#1a1a1a;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loc-tag{font-size:12px;color:#999}
+.loc-tag.ok{color:#1a1a1a}
+.loc-tag.fail{color:#e53935}
+
+/* header */
+.hdr{padding:20px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.hdr-title{font-size:22px;font-weight:700;letter-spacing:-.5px;color:#1a1a1a}
+.hdr-loc{font-size:11px;color:#bbb;margin-top:4px;letter-spacing:.2px}
+.edit-btn{width:32px;height:32px;border-radius:50%;background:#ebebeb;border:none;color:#888;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:inherit}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+.relocate-btn{width:32px;height:32px;border-radius:50%;background:#ebebeb;border:none;color:#888;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:opacity .15s}
+.relocate-btn:active{opacity:.6}
+.relocate-btn:disabled{opacity:.35;cursor:not-allowed}
+.relocate-btn.loading svg{animation:spin .8s linear infinite;transform-origin:center}
+
+/* 슬롯머신 */
+.slot-section{display:flex;flex-direction:column;align-items:center;padding:24px 0 20px}
+.slot-wrap{display:flex;align-items:center;gap:16px}
+
+.reel-box{
+  width:220px;height:56px;
+  background:#fff;
+  border-radius:16px;
+  overflow:hidden;
+  position:relative;
+  border:1px solid #e8e8e8;
+}
+.reel-box::before,.reel-box::after{content:'';position:absolute;left:0;right:0;height:16px;z-index:3;pointer-events:none;}
+.reel-box::before{top:0;background:linear-gradient(to bottom,rgba(255,255,255,1) 0%,rgba(255,255,255,0) 100%)}
+.reel-box::after{bottom:0;background:linear-gradient(to top,rgba(255,255,255,1) 0%,rgba(255,255,255,0) 100%)}
+.reel-track{display:flex;flex-direction:column;will-change:transform;width:220px}
+.reel-item{width:220px;height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.reel-cat{font-size:15px;font-weight:600;color:#1a1a1a;letter-spacing:.2px}
+.reel-sub{font-size:10px;color:#ccc;letter-spacing:.3px}
+
+.slot-hint{font-size:11px;color:#ccc;letter-spacing:.3px;margin-bottom:10px;text-align:center}
+.pull-btn{
+  width:48px;height:48px;border-radius:50%;
+  background:#1a1a1a;border:none;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .1s,opacity .1s;
+  flex-shrink:0;
+}
+
+.pull-btn:active{transform:scale(.93);opacity:.8}
+.pull-btn:disabled{opacity:.25;cursor:not-allowed}
+
+
+
+/* 구분선 */
+.divider{height:1px;background:#ebebeb;margin:0 20px}
+
+/* 목록 */
+.list-sec{flex:1;padding:0 16px 80px}
+.list-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 4px 12px}
+.list-hdr-txt{font-size:12px;color:#bbb;letter-spacing:.3px;text-transform:uppercase;font-weight:500}
+.list-count{font-size:12px;color:#1a1a1a;font-weight:600}
+
+.place-card{background:#fff;border:1px solid #ebebeb;border-radius:14px;padding:16px;margin-bottom:8px;cursor:pointer;transition:border-color .15s}
+.place-card:active{border-color:#1a1a1a}
+.pc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.pc-name{font-size:14px;font-weight:600;color:#1a1a1a;line-height:1.4}
+.pc-dist{font-size:11px;color:#bbb;white-space:nowrap;padding-top:2px;font-weight:500}
+.pc-meta{display:flex;gap:12px;font-size:11px;color:#bbb;flex-wrap:wrap;margin-bottom:6px}
+.pc-walk{color:#888;font-weight:500}
+.pc-addr{font-size:11px;color:#ccc;line-height:1.5}
+.pc-tag{display:inline-block;font-size:10px;padding:2px 8px;border-radius:6px;background:#f5f5f5;color:#aaa;border:1px solid #ebebeb;margin-top:6px;letter-spacing:.3px}
+
+.pc-nav{display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f0}
+.pc-nav.show{display:block}
+.gmap-btn{width:100%;padding:11px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.3px;transition:opacity .15s}
+.gmap-btn:active{opacity:.75}
+
+.empty{display:flex;flex-direction:column;align-items:center;padding:48px 20px;gap:8px;color:#ccc;font-size:13px;text-align:center}
+.empty-title{font-size:14px;font-weight:500;color:#bbb}
+.skeleton{
+  background:#fff;
+  border:1px solid #ebebeb;
+  border-radius:14px;
+  height:88px;
+  margin-bottom:8px;
+  overflow:hidden;
+  position:relative;
+}
+.skeleton::after{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,
+    transparent 0%,
+    rgba(0,0,0,.06) 40%,
+    rgba(0,0,0,.1) 50%,
+    rgba(0,0,0,.06) 60%,
+    transparent 100%
+  );
+  background-size:200% 100%;
+  animation:shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer{
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+.statusbar{text-align:center;font-size:11px;color:#ccc;padding:8px 0 12px;letter-spacing:.2px}
+
+/* 편집 모달 */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:300;align-items:flex-end;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:20px 18px 36px;max-height:80vh;overflow-y:auto}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.modal-title{font-size:15px;font-weight:700}
+.modal-close{width:28px;height:28px;border-radius:50%;background:#f5f5f5;border:none;color:#888;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.cat-item{padding:12px 6px;border-radius:12px;border:1px solid #ebebeb;background:#fafafa;text-align:center;position:relative;cursor:pointer}
+.cat-del{position:absolute;top:5px;right:5px;width:16px;height:16px;border-radius:50%;background:#ebebeb;border:none;color:#aaa;font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cat-label{font-size:12px;font-weight:500;color:#555;line-height:1.3}
+.add-row{display:flex;gap:7px}
+.add-name{flex:1;padding:10px 12px;border-radius:10px;border:1px solid #e8e8e8;background:#fafafa;color:#1a1a1a;font-size:13px;font-family:inherit;outline:none}
+.add-name:focus{border-color:#1a1a1a}
+.add-ok{padding:10px 16px;border-radius:10px;background:#1a1a1a;border:none;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+
+/* 分類選擇器 bottom sheet */
+.cat-picker-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:400;align-items:flex-end;justify-content:center}
+.cat-picker-bg.show{display:flex}
+.cat-picker{background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:430px;padding:0 0 env(safe-area-inset-bottom,20px);max-height:70vh;display:flex;flex-direction:column}
+.cat-picker-hdr{display:flex;justify-content:space-between;align-items:center;padding:18px 18px 12px;border-bottom:1px solid #f0f0f0;flex-shrink:0}
+.cat-picker-title{font-size:15px;font-weight:700}
+.cat-picker-close{width:28px;height:28px;border-radius:50%;background:#f5f5f5;border:none;color:#888;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cat-picker-list{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;padding:8px 0}
+.cat-picker-item{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;font-size:14px;font-weight:500;color:#1a1a1a;cursor:pointer;transition:background .1s}
+.cat-picker-item:active{background:#f5f5f5}
+.cat-picker-item.active{color:#1a1a1a;font-weight:700}
+.cat-picker-item.active::after{content:'✓';font-size:13px;color:#1a1a1a}
+.reel-box{cursor:pointer}
+.reel-tap-hint{font-size:10px;color:#d0d0d0;letter-spacing:.2px;text-align:center;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="loc-overlay" id="locOv">
+  <div class="loc-title">取得位置中</div>
+  <div class="loc-ring" id="locRing"></div>
+  <div class="loc-sub">需要定位權限才能搜尋附近餐廳</div>
+  <div class="loc-tag" id="locTag">請允許瀏覽器存取位置</div>
+</div>
+
+<div class="hdr">
+  <div>
+    <div class="hdr-title">今天吃什麼</div>
+    <div class="hdr-loc" id="hdrLoc">取得位置中</div>
+  </div>
+  <div class="hdr-actions">
+    <button class="relocate-btn" id="relocateBtn" onclick="relocate()" title="重新定位">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+      </svg>
+    </button>
+    <button class="edit-btn" onclick="openModal()" title="編輯分類">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="slot-section">
+  <div class="slot-hint">上下滑動選擇  ·  點擊展開  ·  按鈕隨機</div>
+  <div class="slot-wrap">
+    <div class="reel-box" id="reelBox">
+      <div class="reel-track" id="reelTrack"></div>
+    </div>
+    <button class="pull-btn" id="pullBtn" onclick="pull()" title="隨機">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="2" width="20" height="20" rx="4"/>
+    <circle cx="8" cy="8" r="1.2" fill="white" stroke="none"/>
+    <circle cx="16" cy="8" r="1.2" fill="white" stroke="none"/>
+    <circle cx="8" cy="16" r="1.2" fill="white" stroke="none"/>
+    <circle cx="16" cy="16" r="1.2" fill="white" stroke="none"/>
+    <circle cx="12" cy="12" r="1.2" fill="white" stroke="none"/>
+  </svg>
+</button>
+  </div>
+</div>
+
+
+<div class="divider"></div>
+
+<div class="list-sec">
+  <div class="list-hdr">
+    <span class="list-hdr-txt" id="listLabel">選擇類別</span>
+    <span class="list-count" id="listCount"></span>
+  </div>
+  <div id="placeList">
+    <div class="empty">
+      <div class="empty-title">按右側按鈕開始</div>
+      <div style="font-size:12px;color:#ccc">停止後自動搜尋附近店家</div>
+    </div>
+  </div>
+  <div class="statusbar" id="statusBar"></div>
+</div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <div class="modal-hdr">
+      <span class="modal-title">編輯分類</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="cat-grid" id="catGrid"></div>
+    <div class="add-row">
+      <input class="add-name" id="newName" placeholder="新增分類名稱..."/>
+      <button class="add-ok" onclick="addCat()">新增</button>
+    </div>
+  </div>
+</div>
+
+<div class="cat-picker-bg" id="catPickerBg">
+  <div class="cat-picker">
+    <div class="cat-picker-hdr">
+      <span class="cat-picker-title">選擇類別</span>
+      <button class="cat-picker-close" onclick="closeCatPicker()">✕</button>
+    </div>
+    <div class="cat-picker-list" id="catPickerList"></div>
+  </div>
+</div>
+
+<script>
+const WALK_MPS = 80;
+const walkMin = 10;
+let pulling = false;
+let selectedCat = null;
+let userLat = null, userLng = null;
+let openNavIdx = null;
+
+// ── 分類持久化 ──
+const CAT_KEY = 'food_cats';
+
+function saveCategories() {
+  try {
+    localStorage.setItem(CAT_KEY, JSON.stringify(categories.map(c => c.name)));
+  } catch(e) {}
+}
+
+function loadSavedNames() {
+  try {
+    const raw = localStorage.getItem(CAT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+const DEFAULT_CAT_NAMES = ['日式料理','泰式料理','越式料理','炒飯炒麵','牛肉麵','便當','西式料理','咖啡廳','火鍋','台式小吃','拉麵','鍋貼水餃','豆漿店'];
+const savedNames = loadSavedNames();
+let categories = (savedNames || DEFAULT_CAT_NAMES).map(name => ({ name, osm: nameToOsm(name) }));
+
+function nameToOsm(name) {
+  // 內建分類用精確 query，自訂分類用名稱搜尋
+  const map = {
+    '日式料理': `node["amenity"~"restaurant|fast_food"]["cuisine"~"japanese|sushi|ramen|udon|tonkatsu"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["cuisine"~"japanese|sushi|ramen|udon|tonkatsu"](around:R,LA,LN);`,
+    '泰式料理': `node["amenity"~"restaurant|fast_food"]["cuisine"~"thai"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["cuisine"~"thai"](around:R,LA,LN);`,
+    '越式料理': `node["amenity"~"restaurant|fast_food"]["cuisine"~"vietnamese|pho"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["cuisine"~"vietnamese|pho"](around:R,LA,LN);`,
+    '炒飯炒麵': `node["amenity"~"restaurant|fast_food"]["cuisine"~"chinese|taiwanese|noodle"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["cuisine"~"chinese|taiwanese|noodle"](around:R,LA,LN);`,
+    '牛肉麵':   `node["amenity"~"restaurant"]["name"~"牛肉麵|牛肉面|拉麵"](around:R,LA,LN);way["amenity"~"restaurant"]["name"~"牛肉麵|牛肉面|拉麵"](around:R,LA,LN);`,
+    '便當':     `node["amenity"~"restaurant|fast_food"]["name"~"便當|自助餐"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["name"~"便當|自助餐"](around:R,LA,LN);`,
+    '西式料理': `node["amenity"~"restaurant|fast_food"]["cuisine"~"pizza|burger|american|italian|steak"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["cuisine"~"pizza|burger|american|italian|steak"](around:R,LA,LN);`,
+    '咖啡廳':   `node["amenity"="cafe"](around:R,LA,LN);way["amenity"="cafe"](around:R,LA,LN);`,
+    '火鍋':     `node["amenity"="restaurant"]["name"~"火鍋|涮涮鍋|shabu|hotpot"](around:R,LA,LN);way["amenity"="restaurant"]["name"~"火鍋|涮涮鍋|shabu|hotpot"](around:R,LA,LN);`,
+    '台式小吃': `node["amenity"~"restaurant|fast_food"]["cuisine"="taiwanese"](around:R,LA,LN);node["amenity"~"restaurant|fast_food"]["name"~"小吃|麵線|蚵仔煎|滷味"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["cuisine"="taiwanese"](around:R,LA,LN);`,
+    '拉麵':     `node["amenity"~"restaurant|fast_food"]["cuisine"~"ramen|japanese"](around:R,LA,LN);node["amenity"~"restaurant|fast_food"]["name"~"拉麵|らーめん|ラーメン|ramen"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["name"~"拉麵|らーめん|ラーメン|ramen"](around:R,LA,LN);`,
+    '鍋貼水餃': `node["amenity"~"restaurant|fast_food"]["name"~"鍋貼|水餃|餃子|gyoza"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["name"~"鍋貼|水餃|餃子|gyoza"](around:R,LA,LN);`,
+    '豆漿店':   `node["amenity"~"restaurant|fast_food"]["name"~"豆漿|燒餅|早餐|永和"](around:R,LA,LN);node["amenity"="cafe"]["name"~"豆漿|永和"](around:R,LA,LN);way["amenity"~"restaurant|fast_food"]["name"~"豆漿|燒餅|早餐|永和"](around:R,LA,LN);`,
+  };
+  return map[name] || `node["amenity"~"restaurant|fast_food|cafe"]["name"~"${name}"](around:R,LA,LN);way["amenity"~"restaurant|fast_food|cafe"]["name"~"${name}"](around:R,LA,LN);`;
+}
+
+// ── 滾輪 ──
+const ITEM_H = 56;
+let currentIdx = 0;  // 目前停在哪個分類
+
+function buildReel() {
+  const track = document.getElementById('reelTrack');
+  track.innerHTML = '';
+  // 3 份確保循環
+  for (let r = 0; r < 3; r++) {
+    categories.forEach(cat => {
+      const div = document.createElement('div');
+      div.className = 'reel-item';
+      div.innerHTML = `<div class="reel-cat">${cat.name}</div>`;
+      track.appendChild(div);
+    });
+  }
+  snapTo(currentIdx, false);
+}
+buildReel();
+
+function centerAdj() { return 0; }
+
+// 跳到指定 index（第二份，避免邊界）
+function snapTo(idx, animate) {
+  currentIdx = ((idx % categories.length) + categories.length) % categories.length;
+  const track = document.getElementById('reelTrack');
+  const targetY = -(categories.length * ITEM_H + currentIdx * ITEM_H) + centerAdj();
+  track.style.transition = animate ? 'transform 300ms cubic-bezier(0.25,0.8,0.25,1)' : 'none';
+  track.style.transform = `translateY(${targetY}px)`;
+}
+
+// ── 觸控滑動 ──
+(function setupDrag() {
+  const box = document.getElementById('reelBox');
+  let startY = 0, startIdx = 0, dragging = false, lastY = 0, vel = 0, lastTime = 0;
+  let moved = false;
+
+  const getY = e => e.touches ? e.touches[0].clientY : e.clientY;
+
+  box.addEventListener('touchstart', e => {
+    startY = getY(e); lastY = startY; startIdx = currentIdx;
+    dragging = true; vel = 0; lastTime = Date.now(); moved = false;
+    document.getElementById('reelTrack').style.transition = 'none';
+  }, { passive: true });
+
+  box.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const y = getY(e);
+    const now = Date.now();
+    vel = (y - lastY) / Math.max(1, now - lastTime);
+    lastY = y; lastTime = now;
+    if (Math.abs(y - startY) > 6) moved = true;
+    const delta = startY - y;
+    const rawIdx = startIdx + delta / ITEM_H;
+    const track = document.getElementById('reelTrack');
+    const n = categories.length;
+    const boundedIdx = Math.max(0, Math.min(n - 1, rawIdx));
+    const targetY = -(n * ITEM_H + boundedIdx * ITEM_H) + centerAdj();
+    track.style.transform = `translateY(${targetY}px)`;
+  }, { passive: true });
+
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    if (!moved) {
+      // 判定為點擊 → 開啟選擇器
+      openCatPicker();
+      return;
+    }
+    const momentum = -vel * 80;
+    const delta = (startY - lastY) / ITEM_H + momentum / ITEM_H;
+    const target = Math.round(startIdx + delta);
+    const n = categories.length;
+    snapTo(Math.max(0, Math.min(n - 1, target)), true);
+    // 滑動後自動搜尋
+    if (!pulling && userLat) {
+      setTimeout(() => {
+        selectedCat = categories[currentIdx];
+        searchNearby();
+      }, 320);
+    }
+  };
+
+  box.addEventListener('touchend', endDrag, { passive: true });
+  box.addEventListener('touchcancel', endDrag, { passive: true });
+
+  // 滑鼠支援（桌面測試用）
+  box.addEventListener('mousedown', e => {
+    startY = getY(e); lastY = startY; startIdx = currentIdx;
+    dragging = true; vel = 0; lastTime = Date.now(); moved = false;
+    document.getElementById('reelTrack').style.transition = 'none';
+  });
+  window.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const y = getY(e);
+    const now = Date.now();
+    vel = (y - lastY) / Math.max(1, now - lastTime);
+    lastY = y; lastTime = now;
+    if (Math.abs(y - startY) > 6) moved = true;
+    const delta = startY - y;
+    const n = categories.length;
+    const rawIdx = Math.max(0, Math.min(n - 1, startIdx + delta / ITEM_H));
+    const track = document.getElementById('reelTrack');
+    const targetY = -(n * ITEM_H + rawIdx * ITEM_H) + centerAdj();
+    track.style.transform = `translateY(${targetY}px)`;
+  });
+  window.addEventListener('mouseup', endDrag);
+
+})();
+
+// ── 分類選擇器 ──
+function openCatPicker() {
+  const list = document.getElementById('catPickerList');
+  list.innerHTML = categories.map((c, i) => `
+    <div class="cat-picker-item${i === currentIdx ? ' active' : ''}" onclick="selectCatFromPicker(${i})">
+      <span>${c.name}</span>
+    </div>`).join('');
+  document.getElementById('catPickerBg').classList.add('show');
+}
+
+function closeCatPicker() {
+  document.getElementById('catPickerBg').classList.remove('show');
+}
+
+function selectCatFromPicker(i) {
+  closeCatPicker();
+  snapTo(i, true);
+  if (userLat) {
+    setTimeout(() => {
+      selectedCat = categories[currentIdx];
+      searchNearby();
+    }, 320);
+  }
+}
+
+document.getElementById('catPickerBg').addEventListener('click', e => {
+  if (e.target === document.getElementById('catPickerBg')) closeCatPicker();
+});
+
+// ── 拉霸（隨機）──
+function pull() {
+  if (pulling || !userLat) return;
+  pulling = true;
+  document.getElementById('pullBtn').disabled = true;
+  document.getElementById('placeList').innerHTML = '';
+  document.getElementById('listLabel').textContent = '選擇中';
+  document.getElementById('listCount').textContent = '';
+
+  buildReel();
+  const n = categories.length;
+  const targetIdx = Math.floor(Math.random() * n);
+
+  // 動畫：先快速滾動再 snap
+  const track = document.getElementById('reelTrack');
+  const spinY = -(n * ITEM_H * 2 + targetIdx * ITEM_H) + centerAdj();
+  track.style.transition = 'none';
+  track.style.transform = `translateY(${-(n * ITEM_H + currentIdx * ITEM_H) + centerAdj()}px)`;
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const duration = 2200 + Math.random() * 600;
+    track.style.transition = `transform ${duration}ms cubic-bezier(0.15,0.85,0.3,1.0)`;
+    track.style.transform = `translateY(${spinY}px)`;
+
+    setTimeout(() => {
+      snapTo(targetIdx, false);
+      selectedCat = categories[currentIdx];
+      pulling = false;
+      document.getElementById('pullBtn').disabled = false;
+      searchNearby();
+    }, duration + 60);
+  }));
+}
+
+
+
+// ── 定位 ──
+window.addEventListener('load', getLocation);
+function getLocation() {
+  const CACHE_KEY = 'food_loc';
+  const CACHE_TTL = 30 * 60 * 1000; // 30 分鐘內直接用快取
+
+  const applyLoc = (lat, lng, label) => {
+    userLat = lat; userLng = lng;
+    document.getElementById('hdrLoc').textContent = label;
+  };
+
+  const hideOverlay = () => {
+    document.getElementById('locRing').style.display = 'none';
+    const ov = document.getElementById('locOv');
+    ov.classList.add('out');
+    setTimeout(() => ov.style.display = 'none', 550);
+  };
+
+  const saveCache = (lat, lng) => {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ lat, lng, ts: Date.now() }));
+    } catch(e) {}
+  };
+
+  const loadCache = () => {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (Date.now() - obj.ts > CACHE_TTL) return null;
+      return obj;
+    } catch(e) { return null; }
+  };
+
+  const fetchFresh = (onSuccess, onFail) => {
+    if (!navigator.geolocation) { onFail(); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => onSuccess(p.coords.latitude, p.coords.longitude),
+      onFail,
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const cached = loadCache();
+  if (cached) {
+    // 有快取：直接跳過遮罩，背景靜默更新位置
+    applyLoc(cached.lat, cached.lng, `${cached.lat.toFixed(4)}, ${cached.lng.toFixed(4)}`);
+    hideOverlay();
+    fetchFresh(
+      (lat, lng) => { applyLoc(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`); saveCache(lat, lng); },
+      () => {}
+    );
+  } else {
+    // 沒快取：顯示遮罩等定位
+    fetchFresh(
+      (lat, lng) => {
+        applyLoc(lat, lng, `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+        saveCache(lat, lng);
+        document.getElementById('locTag').textContent = '定位成功';
+        document.getElementById('locTag').className = 'loc-tag ok';
+        hideOverlay();
+      },
+      () => {
+        applyLoc(25.0478, 121.5170, '台北西門町（示範）');
+        document.getElementById('locTag').textContent = '使用示範位置';
+        document.getElementById('locTag').className = 'loc-tag fail';
+        hideOverlay();
+      }
+    );
+  }
+}
+
+
+
+function relocate() {
+  if (!navigator.geolocation) return;
+  const btn = document.getElementById('relocateBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+  try { localStorage.removeItem('food_loc'); } catch(e) {}
+  document.getElementById('hdrLoc').textContent = '取得位置中';
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      userLat = p.coords.latitude; userLng = p.coords.longitude;
+      document.getElementById('hdrLoc').textContent = `${userLat.toFixed(4)}, ${userLng.toFixed(4)}`;
+      try { localStorage.setItem('food_loc', JSON.stringify({ lat: userLat, lng: userLng, ts: Date.now() })); } catch(e) {}
+      btn.classList.remove('loading');
+      btn.disabled = false;
+      if (selectedCat) searchNearby();
+    },
+    () => {
+      document.getElementById('hdrLoc').textContent = '定位失敗';
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+
+
+function haversine(a, b, c, d) {
+  const R = 6371000, dL = (c-a)*Math.PI/180, dN = (d-b)*Math.PI/180;
+  const x = Math.sin(dL/2)**2 + Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dN/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+function setStatus(t) { document.getElementById('statusBar').textContent = t; }
+
+// ── Overpass 搜尋 ──
+// API Key 存在 Netlify 環境變數，前端不暴露
+
+// 每個分類對應的 Google Places 搜尋關鍵字
+const CAT_GOOGLE = {
+  '日式料理': { kw:'japanese restaurant', type:'restaurant' },
+  '泰式料理': { kw:'thai restaurant',     type:'restaurant' },
+  '越式料理': { kw:'vietnamese restaurant',type:'restaurant' },
+  '炒飯炒麵': { kw:'炒飯 炒麵',           type:'restaurant' },
+  '牛肉麵':   { kw:'牛肉麵',              type:'restaurant' },
+  '便當':     { kw:'便當',               type:'restaurant' },
+  '西式料理': { kw:'western restaurant',  type:'restaurant' },
+  '咖啡廳':   { kw:'',                   type:'cafe' },
+  '火鍋':     { kw:'火鍋',               type:'restaurant' },
+  '台式小吃': { kw:'台式小吃',            type:'restaurant' },
+  '拉麵':     { kw:'拉麵',               type:'restaurant' },
+  '鍋貼水餃': { kw:'鍋貼 水餃',           type:'restaurant' },
+  '豆漿店':   { kw:'豆漿 早餐',           type:'restaurant' },
+};
+
+async function searchNearby() {
+  if (!selectedCat || !userLat) return;
+  const radius = walkMin * WALK_MPS;
+  document.getElementById('listLabel').textContent = `${selectedCat.name} · ${walkMin} 分鐘步行內`;
+  document.getElementById('listCount').textContent = '';
+  document.getElementById('placeList').innerHTML = [1,2,3].map(() => `<div class="skeleton">
+  <div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+    <div style="height:14px;width:55%;background:#f0f0f0;border-radius:6px"></div>
+    <div style="height:11px;width:35%;background:#f5f5f5;border-radius:6px"></div>
+    <div style="height:11px;width:70%;background:#f5f5f5;border-radius:6px"></div>
+  </div>
+</div>`).join('');
+  setStatus('搜尋中');
+
+  const catInfo = CAT_GOOGLE[selectedCat.name] || { kw: selectedCat.name, type: 'restaurant' };
+  const params = new URLSearchParams({
+    location: `${userLat},${userLng}`,
+    radius,
+    type: catInfo.type,
+  });
+  if (catInfo.kw) params.set('keyword', catInfo.kw);
+
+  const url = `/.netlify/functions/places?${params}`;
+
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.status === 'REQUEST_DENIED') {
+      throw new Error(data.error_message || 'REQUEST_DENIED');
+    }
+
+    const results = (data.results || []).map(p => {
+      const lat = p.geometry.location.lat;
+      const lng = p.geometry.location.lng;
+      return {
+        name: p.name,
+        lat, lng,
+        dist: Math.round(haversine(userLat, userLng, lat, lng)),
+        rating: p.rating,
+        ratingCount: p.user_ratings_total,
+        addr: p.vicinity || '',
+        opening: p.opening_hours?.open_now != null
+          ? (p.opening_hours.open_now ? '營業中' : '休息中')
+          : '',
+        isOpen: p.opening_hours?.open_now,
+        priceLevel: p.price_level,
+        placeId: p.place_id,
+      };
+    }).sort((a, b) => a.dist - b.dist);
+
+    renderPlaces(results);
+    document.getElementById('listCount').textContent = results.length + ' 間';
+    setStatus(results.length ? `Google Maps · ${results.length} 間店家` : '此範圍內找不到店家');
+  } catch(e) {
+    console.error(e);
+    setStatus('搜尋失敗：' + e.message);
+    document.getElementById('placeList').innerHTML = '<div class="empty"><div class="empty-title">搜尋失敗</div><div style="font-size:12px;color:#ccc">請確認網路連線後重試</div></div>';
+  }
+}
+
+
+let _placeCache = [];
+function renderPlaces(list) {
+  _placeCache = list;
+  if (!list.length) {
+    document.getElementById('placeList').innerHTML = '<div class="empty"><div class="empty-title">找不到店家</div><div style="font-size:12px;color:#ccc">試試增加步行時間或選擇其他類別</div></div>';
+    return;
+  }
+  const priceMap = ['','$','$$','$$$','$$$$'];
+  document.getElementById('placeList').innerHTML = list.map((p, i) => {
+    const mins = Math.round(p.dist / WALK_MPS);
+    const openColor = p.isOpen === true ? '#27ae7a' : p.isOpen === false ? '#e53935' : '#bbb';
+    return `<div class="place-card" onclick="toggleNav(${i})">
+      <div class="pc-top">
+        <div class="pc-name">${p.name}</div>
+        <div class="pc-dist">${p.dist} m</div>
+      </div>
+      <div class="pc-meta">
+        <span class="pc-walk">${mins} 分鐘步行</span>
+        ${p.rating ? `<span>★ ${p.rating} (${p.ratingCount})</span>` : ''}
+        ${p.priceLevel ? `<span>${priceMap[p.priceLevel]}</span>` : ''}
+        ${p.opening ? `<span style="color:${openColor}">${p.opening}</span>` : ''}
+      </div>
+      ${p.addr ? `<div class="pc-addr">${p.addr}</div>` : ''}
+      <div class="pc-nav" id="pnav${i}">
+        <button class="gmap-btn" onclick="navGoogle(event,${i})">前往 Google Maps</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleNav(i) {
+  const nav = document.getElementById('pnav' + i);
+  if (!nav) return;
+  if (openNavIdx !== null && openNavIdx !== i) {
+    const prev = document.getElementById('pnav' + openNavIdx);
+    if (prev) prev.classList.remove('show');
+  }
+  const isOpen = nav.classList.contains('show');
+  nav.classList.toggle('show', !isOpen);
+  openNavIdx = isOpen ? null : i;
+}
+
+function navGoogle(e, idx) {
+  e.stopPropagation();
+  const p = _placeCache[idx];
+  if (!p) return;
+  const q = encodeURIComponent(p.name + (p.addr ? ' ' + p.addr : ''));
+  window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+}
+
+// ── 編輯 ──
+function openModal() { renderCatGrid(); document.getElementById('modalBg').classList.add('show'); }
+function closeModal() { document.getElementById('modalBg').classList.remove('show'); buildReel(); }
+document.getElementById('modalBg').addEventListener('click', e => { if (e.target === document.getElementById('modalBg')) closeModal(); });
+
+function renderCatGrid() {
+  document.getElementById('catGrid').innerHTML = categories.map((c, i) => `
+    <div class="cat-item">
+      <button class="cat-del" onclick="delCat(event,${i})">✕</button>
+      <div class="cat-label">${c.name}</div>
+    </div>`).join('');
+}
+function delCat(e, i) {
+  e.stopPropagation();
+  if (categories.length <= 3) { alert('至少保留 3 個分類'); return; }
+  categories.splice(i, 1); saveCategories(); renderCatGrid();
+}
+function addCat() {
+  const name = document.getElementById('newName').value.trim();
+  if (!name) { document.getElementById('newName').focus(); return; }
+  categories.push({
+    name,
+    osm: `node["amenity"~"restaurant|fast_food|cafe"]["name"~"${name}"](around:R,LA,LN);way["amenity"~"restaurant|fast_food|cafe"]["name"~"${name}"](around:R,LA,LN);`
+  });
+  document.getElementById('newName').value = '';
+  saveCategories();
+  renderCatGrid();
+}
+document.getElementById('newName').addEventListener('keydown', e => { if (e.key === 'Enter') addCat(); });
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'eat-v1';
+    const ASSETS = [location.href];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener('fetch', e => {
+      if (e.request.url.includes('overpass') || e.request.url.includes('googleapis')) return;
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      })));
+    });
+  `;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(url).catch(() => {});
+}
+</script>
+</body>
+</html>
