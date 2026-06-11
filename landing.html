@@ -59,10 +59,11 @@ header.site.scrolled{background:rgba(6,6,10,.55);backdrop-filter:blur(14px);
 main{position:relative;z-index:2}
 section{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
   justify-content:center;align-items:center;text-align:center;position:relative;
-  padding:120px clamp(20px,6vw,72px)}
+  padding:120px clamp(20px,6vw,72px);text-shadow:0 1px 18px rgba(3,3,6,.85)}
 .eyebrow{font-size:11px;letter-spacing:.5em;text-transform:uppercase;color:var(--gold);
   margin-bottom:22px;padding-left:.5em}
-h1,h2{font-family:'Cormorant Garamond',serif;font-weight:500;color:#f4f5f8;line-height:1.1}
+h1,h2{font-family:'Cormorant Garamond',serif;font-weight:500;color:#f4f5f8;line-height:1.1;
+  text-shadow:0 2px 30px rgba(3,3,6,.9),0 0 8px rgba(3,3,6,.45)}
 h1{font-size:clamp(46px,10vw,110px)}
 h2{font-size:clamp(32px,5.6vw,64px)}
 .gold-i{font-style:italic;color:var(--gold-2)}
@@ -125,7 +126,9 @@ h2{font-size:clamp(32px,5.6vw,64px)}
 /* stats */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;
   width:100%;max-width:1000px;margin-top:56px}
-.stat{padding:36px 24px 10px;border-top:1px solid rgba(212,175,55,.25)}
+.stat{padding:36px 24px 30px;border:1px solid rgba(212,175,55,.16);border-radius:18px;
+  background:linear-gradient(160deg,rgba(14,14,20,.74),rgba(8,8,12,.55));
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .stat b{display:block;font-family:'Cormorant Garamond',serif;font-weight:500;
   font-size:clamp(42px,6vw,64px);line-height:1;color:var(--gold-2)}
 .stat span{display:block;margin-top:14px;font-size:11.5px;letter-spacing:.22em;
@@ -288,7 +291,7 @@ nav.dots a.on{background:var(--gold);border-color:var(--gold);box-shadow:0 0 12p
   <section id="join">
     <div class="rule reveal"></div>
     <p class="eyebrow reveal">Join the Constellation</p>
-    <h2 class="reveal d1">The universe<br>is <span class="gold-i">waiting</span></h2>
+    <h2 class="reveal d1">The universe<br>is <span class="gold-i">you</span></h2>
     <p class="lede reveal d2">Launching Winter 2026. Join for early access, private
       previews and the first 999 numbered pieces.</p>
     <form class="cta reveal d3" id="ctaForm" novalidate>
@@ -310,231 +313,9 @@ nav.dots a.on{background:var(--gold);border-color:var(--gold);box-shadow:0 0 12p
   <span class="copy">© 2026 NÉBULA Paris — Crafted among the stars.</span>
 </footer>
 
-<script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
-</script>
-<script type="module">
-import * as THREE from 'three';
-
-const canvas = document.getElementById('scene');
-const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 768;
-
-let renderer;
-try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, powerPreference: 'high-performance' });
-} catch (e) {
-  canvas.remove(); // no WebGL — page stays readable on plain black
-}
-
-if (renderer) {
-  renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.8 : 2));
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.setClearColor(0x06060a, 1);
-
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x06060a, 0.04);
-  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 160);
-
-  // --- soft sprite textures (generated, no asset downloads) ---
-  function radialTexture(size, stops) {
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
-    const g = c.getContext('2d');
-    const r = g.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
-    for (const [off, col] of stops) r.addColorStop(off, col);
-    g.fillStyle = r;
-    g.fillRect(0, 0, size, size);
-    return new THREE.CanvasTexture(c);
-  }
-  const dotTex = radialTexture(64, [
-    [0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,.6)'], [1, 'rgba(255,255,255,0)']
-  ]);
-  const glowGold = radialTexture(256, [
-    [0, 'rgba(255,236,180,1)'], [0.25, 'rgba(212,175,55,.55)'], [0.6, 'rgba(140,105,30,.16)'], [1, 'rgba(0,0,0,0)']
-  ]);
-  const glowSilver = radialTexture(256, [
-    [0, 'rgba(235,240,250,.9)'], [0.3, 'rgba(170,182,205,.4)'], [0.65, 'rgba(110,120,145,.12)'], [1, 'rgba(0,0,0,0)']
-  ]);
-  const glowAmber = radialTexture(256, [
-    [0, 'rgba(220,180,90,.8)'], [0.35, 'rgba(150,110,40,.3)'], [0.7, 'rgba(80,60,20,.1)'], [1, 'rgba(0,0,0,0)']
-  ]);
-
-  const universe = new THREE.Group();
-  scene.add(universe);
-
-  // --- spiral galaxy ---
-  const galaxy = new THREE.Group();
-  universe.add(galaxy);
-  {
-    const count = isMobile ? 26000 : 55000;
-    const radius = 6, branches = 4, spin = 1.25;
-    const randomness = 0.42, randomnessPower = 2.6;
-    const colCore = new THREE.Color('#f7e7b1');   // bright gold core
-    const colMid  = new THREE.Color('#d4af37');   // gold arms
-    const colEdge = new THREE.Color('#aebbd1');   // silver rim
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      const r = Math.pow(Math.random(), 1.5) * radius;
-      const branchAngle = ((i % branches) / branches) * Math.PI * 2;
-      const spinAngle = r * spin;
-      const rnd = () =>
-        Math.pow(Math.random(), randomnessPower) * (Math.random() < 0.5 ? 1 : -1) * randomness * r;
-      positions[i3]     = Math.cos(branchAngle + spinAngle) * r + rnd();
-      positions[i3 + 1] = rnd() * 0.45;
-      positions[i3 + 2] = Math.sin(branchAngle + spinAngle) * r + rnd();
-      const t = r / radius;
-      const c = t < 0.3
-        ? colCore.clone().lerp(colMid, t / 0.3)
-        : colMid.clone().lerp(colEdge, (t - 0.3) / 0.7);
-      colors[i3] = c.r; colors[i3 + 1] = c.g; colors[i3 + 2] = c.b;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    const mat = new THREE.PointsMaterial({
-      size: isMobile ? 0.05 : 0.038, sizeAttenuation: true, map: dotTex,
-      vertexColors: true, transparent: true, depthWrite: false,
-      blending: THREE.AdditiveBlending
-    });
-    galaxy.add(new THREE.Points(geo, mat));
-
-    // luminous golden core
-    const core = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowGold, transparent: true, depthWrite: false,
-      blending: THREE.AdditiveBlending, opacity: 0.95
-    }));
-    core.scale.setScalar(3.4);
-    galaxy.add(core);
-  }
-
-  // --- distant starfield ---
-  {
-    const count = isMobile ? 1500 : 2600;
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const silver = new THREE.Color('#cdd2dc'), gold = new THREE.Color('#f2dc9b');
-    for (let i = 0; i < count; i++) {
-      const i3 = i * 3;
-      const rad = 25 + Math.random() * 55;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
-      positions[i3]     = rad * Math.sin(phi) * Math.cos(theta);
-      positions[i3 + 1] = rad * Math.cos(phi);
-      positions[i3 + 2] = rad * Math.sin(phi) * Math.sin(theta);
-      const c = Math.random() < 0.15 ? gold : silver;
-      colors[i3] = c.r; colors[i3 + 1] = c.g; colors[i3 + 2] = c.b;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    universe.add(new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.32, sizeAttenuation: true, map: dotTex, vertexColors: true,
-      transparent: true, opacity: 0.85, depthWrite: false,
-      blending: THREE.AdditiveBlending
-    })));
-  }
-
-  // --- nebula clouds (billboarded glow sprites) ---
-  const nebulae = [];
-  {
-    const tints = [glowGold, glowSilver, glowAmber];
-    const n = isMobile ? 8 : 12;
-    for (let i = 0; i < n; i++) {
-      const mat = new THREE.SpriteMaterial({
-        map: tints[i % tints.length], transparent: true, depthWrite: false,
-        blending: THREE.AdditiveBlending, opacity: 0.05 + Math.random() * 0.07,
-        rotation: Math.random() * Math.PI * 2
-      });
-      const s = new THREE.Sprite(mat);
-      const a = Math.random() * Math.PI * 2;
-      const d = 5 + Math.random() * 9;
-      s.position.set(Math.cos(a) * d, (Math.random() - 0.5) * 6, Math.sin(a) * d);
-      s.scale.setScalar(13 + Math.random() * 13);
-      s.userData.spin = (Math.random() - 0.5) * 0.02;
-      universe.add(s);
-      nebulae.push(s);
-    }
-  }
-
-  // --- scroll-driven camera flight ---
-  // one keyframe per section: hero → philosophy → collection → alchemy → join
-  const KF = [
-    { p: new THREE.Vector3( 0.0, 2.4,  8.2), l: new THREE.Vector3( 0.0, 0.0, 0) },
-    { p: new THREE.Vector3( 3.4, 0.7,  5.6), l: new THREE.Vector3( 0.0, 0.2, 0) },
-    { p: new THREE.Vector3(-3.6, 1.6,  5.0), l: new THREE.Vector3(-0.4, 0.0, 0) },
-    { p: new THREE.Vector3( 0.0, 0.7,  2.9), l: new THREE.Vector3( 0.0, 0.0, 0) },
-    { p: new THREE.Vector3( 0.0, 5.2, 10.5), l: new THREE.Vector3( 0.0, 0.0, 0) }
-  ];
-  const smooth = t => t * t * (3 - 2 * t);
-  const camPos = KF[0].p.clone(), camLook = KF[0].l.clone();
-  const tmpP = new THREE.Vector3(), tmpL = new THREE.Vector3();
-
-  let scrollTarget = 0, scrollCur = 0;
-  const bar = document.getElementById('bar');
-  const hdr = document.getElementById('hdr');
-  function onScroll() {
-    const max = document.documentElement.scrollHeight - innerHeight;
-    scrollTarget = max > 0 ? scrollY / max : 0;
-    bar.style.transform = `scaleX(${scrollTarget})`;
-    hdr.classList.toggle('scrolled', scrollY > 40);
-  }
-  addEventListener('scroll', onScroll, { passive: true });
-  onScroll();
-
-  // subtle pointer / touch parallax
-  let parX = 0, parY = 0, parTX = 0, parTY = 0;
-  addEventListener('pointermove', e => {
-    parTX = (e.clientX / innerWidth - 0.5) * 2;
-    parTY = (e.clientY / innerHeight - 0.5) * 2;
-  }, { passive: true });
-
-  addEventListener('resize', () => {
-    camera.aspect = innerWidth / innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(innerWidth, innerHeight);
-    onScroll();
-  });
-
-  const clock = new THREE.Clock();
-  function render() {
-    requestAnimationFrame(render);
-    if (document.hidden) return; // browser already throttles rAF; skip work just in case
-    const dt = Math.min(clock.getDelta(), 0.05);
-    const t = clock.elapsedTime;
-
-    // damped scroll + parallax (instant when reduced motion is preferred)
-    const k = reduceMotion ? 1 : 1 - Math.pow(0.002, dt);
-    scrollCur += (scrollTarget - scrollCur) * k;
-    parX += (parTX - parX) * k * 0.6;
-    parY += (parTY - parY) * k * 0.6;
-
-    // interpolate camera along keyframes
-    const seg = THREE.MathUtils.clamp(scrollCur, 0, 1) * (KF.length - 1);
-    const i = Math.min(Math.floor(seg), KF.length - 2);
-    const f = smooth(seg - i);
-    tmpP.lerpVectors(KF[i].p, KF[i + 1].p, f);
-    tmpL.lerpVectors(KF[i].l, KF[i + 1].l, f);
-    camPos.copy(tmpP);
-    camLook.copy(tmpL);
-    camera.position.set(camPos.x + parX * 0.4, camPos.y - parY * 0.25, camPos.z);
-    camera.lookAt(camLook);
-
-    // slow celestial drift
-    if (!reduceMotion) {
-      galaxy.rotation.y = t * 0.04 + scrollCur * 1.4;
-      universe.rotation.y = t * 0.004;
-      for (const s of nebulae) s.material.rotation += s.userData.spin * dt;
-    } else {
-      galaxy.rotation.y = scrollCur * 1.4;
-    }
-
-    renderer.render(scene, camera);
-  }
-  render();
-}
+<script>
+// UI wiring lives outside the module so the page stays usable even if
+// WebGL or the three.js module fails to load.
 
 // --- reveal-on-scroll ---
 const revealIO = new IntersectionObserver(entries => {
@@ -570,7 +351,417 @@ document.getElementById('ctaForm').addEventListener('submit', e => {
 // --- loader ---
 const loaderDone = () => document.getElementById('loader').classList.add('done');
 addEventListener('load', loaderDone);
-setTimeout(loaderDone, 2500); // fallback if a CDN asset stalls
+setTimeout(loaderDone, 2500); // fallback if any asset stalls
+</script>
+<script type="importmap">
+{ "imports": { "three": "./assets/three.module.min.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const canvas = document.getElementById('scene');
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isMobile = matchMedia('(pointer: coarse)').matches || innerWidth < 768;
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, powerPreference: 'high-performance' });
+} catch (e) {
+  canvas.remove(); // no WebGL — page stays readable on plain black
+}
+
+if (renderer) {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile ? 1.8 : 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setClearColor(0x06060a, 1);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 160);
+
+  // --- soft glow textures (generated, no asset downloads) ---
+  function radialTexture(size, stops) {
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const g = c.getContext('2d');
+    const r = g.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+    for (const [off, col] of stops) r.addColorStop(off, col);
+    g.fillStyle = r;
+    g.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(c);
+  }
+  const dotTex = radialTexture(64, [
+    [0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,.6)'], [1, 'rgba(255,255,255,0)']
+  ]);
+  const glowGold = radialTexture(256, [
+    [0, 'rgba(255,236,180,1)'], [0.25, 'rgba(212,175,55,.55)'], [0.6, 'rgba(140,105,30,.16)'], [1, 'rgba(0,0,0,0)']
+  ]);
+  const glowSilver = radialTexture(256, [
+    [0, 'rgba(235,240,250,.9)'], [0.3, 'rgba(170,182,205,.4)'], [0.65, 'rgba(110,120,145,.12)'], [1, 'rgba(0,0,0,0)']
+  ]);
+  const glowAmber = radialTexture(256, [
+    [0, 'rgba(220,180,90,.8)'], [0.35, 'rgba(150,110,40,.3)'], [0.7, 'rgba(80,60,20,.1)'], [1, 'rgba(0,0,0,0)']
+  ]);
+
+  const universe = new THREE.Group();
+  scene.add(universe);
+
+  // ============================================================
+  //  Morphing particle cloud: primordial clumps → spiral galaxy
+  //  → female profile. Targets are baked into vertex attributes;
+  //  the vertex shader blends them from two scroll-driven uniforms.
+  // ============================================================
+  const COUNT = isMobile ? 24000 : 50000;
+
+  const GOLD_CORE = new THREE.Color('#f7e7b1');
+  const GOLD      = new THREE.Color('#d4af37');
+  const SILVER    = new THREE.Color('#aebbd1');
+  const SILVER_HI = new THREE.Color('#e9edf7');
+  const AMBER     = new THREE.Color('#b98a2e');
+
+  // --- stage A: scattered primordial clumps ---
+  const CLUSTERS = [
+    { c: [-3.6,  1.4, -1.2], s: 0.95 },
+    { c: [ 3.2,  0.6,  0.8], s: 0.80 },
+    { c: [ 0.4, -1.6,  2.2], s: 0.65 },
+    { c: [-1.8, -0.9, -2.6], s: 0.80 },
+    { c: [ 2.4,  2.3, -2.0], s: 0.60 },
+    { c: [-0.7,  2.9,  1.6], s: 0.55 },
+    { c: [ 1.1,  0.2,  3.1], s: 0.50 }
+  ];
+  function genClusters(n) {
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const c = new THREE.Color();
+    const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 0.66;
+    for (let i = 0; i < n; i++) {
+      const i3 = i * 3;
+      if (Math.random() < 0.12) { // thin intercluster gas
+        pos[i3] = (Math.random() - .5) * 12;
+        pos[i3+1] = (Math.random() - .5) * 8;
+        pos[i3+2] = (Math.random() - .5) * 10;
+        c.copy(SILVER).multiplyScalar(0.4);
+      } else {
+        const k = i % CLUSTERS.length, { c: ctr } = CLUSTERS[k];
+        const s = CLUSTERS[k].s * 1.25;
+        const dx = gauss() * s, dy = gauss() * s * 0.8, dz = gauss() * s;
+        pos[i3] = ctr[0] + dx; pos[i3+1] = ctr[1] + dy; pos[i3+2] = ctr[2] + dz;
+        const heat = Math.max(0, 1 - Math.hypot(dx, dy, dz) / (s * 1.6));
+        c.copy(k % 2 ? AMBER : SILVER).lerp(SILVER_HI, heat * 0.5).multiplyScalar(0.78);
+      }
+      col[i3] = c.r; col[i3+1] = c.g; col[i3+2] = c.b;
+    }
+    return { pos, col };
+  }
+
+  // --- stage B: spiral galaxy ---
+  function genGalaxy(n) {
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const radius = 6, branches = 4, spin = 1.25, randomness = 0.42, power = 2.6;
+    const c = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const i3 = i * 3;
+      const r = Math.pow(Math.random(), 1.5) * radius;
+      const branchAngle = ((i % branches) / branches) * Math.PI * 2;
+      const spinAngle = r * spin;
+      const rnd = () =>
+        Math.pow(Math.random(), power) * (Math.random() < .5 ? 1 : -1) * randomness * r;
+      pos[i3]   = Math.cos(branchAngle + spinAngle) * r + rnd();
+      pos[i3+1] = rnd() * 0.45;
+      pos[i3+2] = Math.sin(branchAngle + spinAngle) * r + rnd();
+      const t = r / radius;
+      c.copy(t < .3 ? GOLD_CORE : GOLD).lerp(t < .3 ? GOLD : SILVER, t < .3 ? t / .3 : (t - .3) / .7);
+      col[i3] = c.r; col[i3+1] = c.g; col[i3+2] = c.b;
+    }
+    return { pos, col };
+  }
+
+  // --- stage C: female profile, sampled from a canvas silhouette ---
+  function genFace(n) {
+    const W = 400, H = 520;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const g = cv.getContext('2d', { willReadFrequently: true });
+    // profile facing right: crown → forehead → nose → lips → chin →
+    // neck → collar, then back up via nape and a low chignon bun
+    const PROFILE = new Path2D([
+      'M148 46',
+      'C196 30 240 52 256 96',          // crown → top of forehead
+      'C262 118 264 142 258 166',       // forehead
+      'C255 172 254 178 256 186',       // brow → bridge dip
+      'C262 196 276 202 284 212',       // nose ridge → tip
+      'C286 218 276 222 268 226',       // under-nose
+      'C265 231 264 236 266 242',       // nostril → philtrum
+      'C273 244 277 249 270 256',       // upper lip
+      'C277 259 278 266 270 275',       // lower lip
+      'C265 280 272 286 270 297',       // lip-chin groove → chin apex
+      'C266 308 250 316 228 322',       // chin → jaw
+      'C212 328 208 336 210 352',       // jaw → throat
+      'C212 376 208 402 200 430',       // front of neck
+      'C196 446 206 462 224 478',       // flare to collar
+      'L118 478',                        // base
+      'C128 452 134 428 132 402',       // back of neck
+      'C130 382 124 368 112 356',       // nape
+      'C88 344 60 330 48 300',          // hair mass → bun underside
+      'C28 278 30 236 50 212',          // bun outer curve
+      'C66 192 84 184 100 170',         // bun top → hair sweep
+      'C96 128 116 72 148 46',          // back of head → crown
+      'Z'
+    ].join(' '));
+    g.fillStyle = '#fff';
+    g.fill(PROFILE);
+    const img = g.getImageData(0, 0, W, H).data;
+    const inside = (x, y) =>
+      x >= 0 && y >= 0 && x < W && y < H && img[((y|0) * W + (x|0)) * 4 + 3] > 128;
+
+    const fill = [], edge = [];
+    for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
+      if (!inside(x, y)) continue;
+      const isEdge = !(inside(x-3,y) && inside(x+3,y) && inside(x,y-3) && inside(x,y+3));
+      (isEdge ? edge : fill).push(x, y);
+    }
+
+    const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const c = new THREE.Color();
+    // desktop: seat the head right of centre so the copy stays readable;
+    // mobile: centred but smaller, the shader dims it behind the text
+    const S = isMobile ? 0.008 : 0.0105;
+    const OX = isMobile ? 0 : 1.5;
+    const CX = 200, CY = 255, OY = isMobile ? 0.45 : 0.15;
+    for (let i = 0; i < n; i++) {
+      const i3 = i * 3;
+      const useEdge = edge.length > 0 && Math.random() < 0.35;
+      const arr = useEdge ? edge : fill;
+      const j = (Math.random() * arr.length / 2 | 0) * 2;
+      const px = arr[j] + Math.random() * 2, py = arr[j+1] + Math.random() * 2;
+      pos[i3]   = (px - CX) * S + OX;
+      pos[i3+1] = (CY - py) * S + OY;
+      pos[i3+2] = (Math.random() - .5) * (useEdge ? 0.1 : 0.3);
+      const t = THREE.MathUtils.clamp((py - 60) / 360, 0, 1); // hair → face gradient
+      c.copy(SILVER).lerp(GOLD, 0.15 + t * 0.8);
+      if (useEdge) c.lerp(GOLD_CORE, 0.35); else c.multiplyScalar(0.75);
+      col[i3] = c.r; col[i3+1] = c.g; col[i3+2] = c.b;
+    }
+    return { pos, col };
+  }
+
+  const A = genClusters(COUNT), B = genGalaxy(COUNT), C = genFace(COUNT);
+  const scales = new Float32Array(COUNT), rands = new Float32Array(COUNT);
+  for (let i = 0; i < COUNT; i++) {
+    scales[i] = 0.6 + Math.random();
+    rands[i] = Math.random();
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(A.pos, 3));
+  geo.setAttribute('aGalaxy', new THREE.BufferAttribute(B.pos, 3));
+  geo.setAttribute('aFace',   new THREE.BufferAttribute(C.pos, 3));
+  geo.setAttribute('cA', new THREE.BufferAttribute(A.col, 3));
+  geo.setAttribute('cB', new THREE.BufferAttribute(B.col, 3));
+  geo.setAttribute('cC', new THREE.BufferAttribute(C.col, 3));
+  geo.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
+  geo.setAttribute('aRand',  new THREE.BufferAttribute(rands, 1));
+
+  const uniforms = {
+    uM1:   { value: 0 },   // clumps → galaxy
+    uM2:   { value: 0 },   // galaxy → face
+    uTime: { value: 0 },
+    uSize: { value: isMobile ? 0.052 : 0.036 },
+    uFaceDim: { value: isMobile ? 0.2 : 0.42 },
+    uProj: { value: 1 }    // projection scale, set in resize()
+  };
+  const material = new THREE.ShaderMaterial({
+    uniforms, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    vertexShader: /* glsl */`
+      attribute vec3 aGalaxy; attribute vec3 aFace;
+      attribute vec3 cA; attribute vec3 cB; attribute vec3 cC;
+      attribute float aScale; attribute float aRand;
+      uniform float uM1, uM2, uTime, uSize, uProj, uFaceDim;
+      varying vec3 vColor; varying float vDim;
+      void main() {
+        // per-particle stagger so shapes dissolve grain by grain
+        float m1 = smoothstep(0., 1., clamp(uM1 * 1.35 - aRand * .35, 0., 1.));
+        float m2 = smoothstep(0., 1., clamp(uM2 * 1.35 - aRand * .35, 0., 1.));
+        vec3 p = mix(mix(position, aGalaxy, m1), aFace, m2);
+        p += 0.02 * vec3(sin(uTime * .6 + aRand * 17.),
+                         cos(uTime * .5 + aRand * 23.),
+                         sin(uTime * .7 + aRand * 29.));
+        vec4 mv = modelViewMatrix * vec4(p, 1.);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = uSize * aScale * uProj / -mv.z;
+        vColor = mix(mix(cA, cB, m1), cC, m2);
+        vDim = mix(1., uFaceDim, m2); // face plane is dense — tame the bloom
+      }`,
+    fragmentShader: /* glsl */`
+      varying vec3 vColor; varying float vDim;
+      void main() {
+        float d = length(gl_PointCoord - .5);
+        float a = smoothstep(.5, .08, d) * vDim;
+        gl_FragColor = vec4(vColor, a);
+      }`
+  });
+  const cloud = new THREE.Points(geo, material);
+  universe.add(cloud);
+
+  // golden galaxy core — only glows while the galaxy exists
+  const core = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowGold, transparent: true, depthWrite: false,
+    blending: THREE.AdditiveBlending, opacity: 0
+  }));
+  core.scale.setScalar(3.4);
+  universe.add(core);
+
+  // faint glows seated in each primordial clump
+  const clumpGlows = CLUSTERS.map(({ c, s }, i) => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: i % 2 ? glowSilver : glowAmber, transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, opacity: 0.35
+    }));
+    sp.position.set(c[0], c[1], c[2]);
+    sp.scale.setScalar(s * 6);
+    universe.add(sp);
+    return sp;
+  });
+
+  // --- distant starfield ---
+  const stars = new THREE.Group();
+  scene.add(stars);
+  {
+    const count = isMobile ? 1500 : 2600;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      const rad = 25 + Math.random() * 55;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      positions[i3]   = rad * Math.sin(phi) * Math.cos(theta);
+      positions[i3+1] = rad * Math.cos(phi);
+      positions[i3+2] = rad * Math.sin(phi) * Math.sin(theta);
+      const c = Math.random() < 0.15 ? GOLD : SILVER;
+      colors[i3] = c.r; colors[i3+1] = c.g; colors[i3+2] = c.b;
+    }
+    const sg = new THREE.BufferGeometry();
+    sg.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    sg.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    stars.add(new THREE.Points(sg, new THREE.PointsMaterial({
+      size: 0.32, sizeAttenuation: true, map: dotTex, vertexColors: true,
+      transparent: true, opacity: 0.85, depthWrite: false,
+      blending: THREE.AdditiveBlending
+    })));
+  }
+
+  // --- nebula clouds (billboarded glow sprites) ---
+  const nebulae = [];
+  {
+    const tints = [glowGold, glowSilver, glowAmber];
+    const n = isMobile ? 8 : 12;
+    for (let i = 0; i < n; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: tints[i % tints.length], transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, opacity: 0.05 + Math.random() * 0.07,
+        rotation: Math.random() * Math.PI * 2
+      });
+      const s = new THREE.Sprite(mat);
+      const a = Math.random() * Math.PI * 2;
+      const d = 7 + Math.random() * 9;
+      s.position.set(Math.cos(a) * d, (Math.random() - .5) * 6, Math.sin(a) * d);
+      s.scale.setScalar(13 + Math.random() * 13);
+      s.userData.spin = (Math.random() - .5) * 0.02;
+      scene.add(s);
+      nebulae.push(s);
+    }
+  }
+
+  // --- scroll-driven camera flight ---
+  // one keyframe per section: hero → philosophy → collection → alchemy → join
+  const KF = [
+    { p: new THREE.Vector3( 0.0, 0.8, 10.0), l: new THREE.Vector3(0,  0.0, 0) },
+    { p: new THREE.Vector3( 3.0, 2.0,  8.2), l: new THREE.Vector3(0,  0.0, 0) },
+    { p: new THREE.Vector3( 0.0, 3.4,  6.8), l: new THREE.Vector3(0,  0.0, 0) },
+    { p: new THREE.Vector3(-2.4, 1.2,  6.0), l: new THREE.Vector3(0,  0.0, 0) },
+    { p: new THREE.Vector3( 0.0, 0.2,  7.2), l: new THREE.Vector3(0,  0.2, 0) }
+  ];
+  const smooth = t => t * t * (3 - 2 * t);
+  const tmpP = new THREE.Vector3(), tmpL = new THREE.Vector3();
+
+  let scrollTarget = 0, scrollCur = 0;
+  const bar = document.getElementById('bar');
+  const hdr = document.getElementById('hdr');
+  function onScroll() {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    scrollTarget = max > 0 ? scrollY / max : 0;
+    bar.style.transform = `scaleX(${scrollTarget})`;
+    hdr.classList.toggle('scrolled', scrollY > 40);
+  }
+  addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // subtle pointer / touch parallax
+  let parX = 0, parY = 0, parTX = 0, parTY = 0;
+  addEventListener('pointermove', e => {
+    parTX = (e.clientX / innerWidth - .5) * 2;
+    parTY = (e.clientY / innerHeight - .5) * 2;
+  }, { passive: true });
+
+  function resize() {
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    uniforms.uProj.value =
+      renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    onScroll();
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  const clock = new THREE.Clock();
+  function render() {
+    requestAnimationFrame(render);
+    if (document.hidden) return; // browser already throttles rAF; skip work just in case
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const t = clock.elapsedTime;
+
+    // damped scroll + parallax (instant when reduced motion is preferred)
+    const k = reduceMotion ? 1 : 1 - Math.pow(0.002, dt);
+    scrollCur += (scrollTarget - scrollCur) * k;
+    parX += (parTX - parX) * k * .6;
+    parY += (parTY - parY) * k * .6;
+
+    // morph progress: clumps → galaxy across philosophy,
+    // galaxy → face across alchemy
+    const p = THREE.MathUtils.clamp(scrollCur, 0, 1);
+    const m1 = smooth(THREE.MathUtils.clamp((p - 0.06) / 0.38, 0, 1));
+    const m2 = smooth(THREE.MathUtils.clamp((p - 0.56) / 0.38, 0, 1));
+    uniforms.uM1.value = m1;
+    uniforms.uM2.value = m2;
+    uniforms.uTime.value = reduceMotion ? 0 : t;
+
+    core.material.opacity = 0.95 * m1 * (1 - m2);
+    for (const sp of clumpGlows) sp.material.opacity = 0.35 * (1 - m1);
+
+    // interpolate camera along keyframes
+    const seg = p * (KF.length - 1);
+    const i = Math.min(Math.floor(seg), KF.length - 2);
+    const f = smooth(seg - i);
+    tmpP.lerpVectors(KF[i].p, KF[i + 1].p, f);
+    tmpL.lerpVectors(KF[i].l, KF[i + 1].l, f);
+    camera.position.set(tmpP.x + parX * .4, tmpP.y - parY * .25, tmpP.z);
+    camera.lookAt(tmpL);
+
+    // galaxy slowly spins, then eases to a halt as the face forms
+    const spin = (reduceMotion ? 0 : t * 0.05) + p * 1.1;
+    cloud.rotation.y = spin * (1 - m2);
+    core.position.set(0, 0, 0);
+
+    if (!reduceMotion) {
+      stars.rotation.y = t * 0.004;
+      for (const s of nebulae) s.material.rotation += s.userData.spin * dt;
+    }
+
+    renderer.render(scene, camera);
+  }
+  render();
+}
 </script>
 </body>
 </html>
