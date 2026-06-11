@@ -517,11 +517,9 @@ if (renderer) {
     const inside = (x, y) =>
       x >= 0 && y >= 0 && x < W && y < H && img[((y|0) * W + (x|0)) * 4 + 3] > 128;
 
-    const fill = [], edge = [];
+    const fill = [];
     for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) {
-      if (!inside(x, y)) continue;
-      const isEdge = !(inside(x-3,y) && inside(x+3,y) && inside(x,y-3) && inside(x,y+3));
-      (isEdge ? edge : fill).push(x, y);
+      if (inside(x, y)) fill.push(x, y);
     }
 
     const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
@@ -531,18 +529,20 @@ if (renderer) {
     const S = isMobile ? 0.008 : 0.0105;
     const OX = isMobile ? 0 : 1.5;
     const CX = 200, CY = 255, OY = isMobile ? 0.45 : 0.15;
+    const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) * 0.66;
     for (let i = 0; i < n; i++) {
       const i3 = i * 3;
-      const useEdge = edge.length > 0 && Math.random() < 0.35;
-      const arr = useEdge ? edge : fill;
-      const j = (Math.random() * arr.length / 2 | 0) * 2;
-      const px = arr[j] + Math.random() * 2, py = arr[j+1] + Math.random() * 2;
-      pos[i3]   = (px - CX) * S + OX;
-      pos[i3+1] = (CY - py) * S + OY;
-      pos[i3+2] = (Math.random() - .5) * (useEdge ? 0.1 : 0.3);
+      const j = (Math.random() * fill.length / 2 | 0) * 2;
+      const px = fill[j] + Math.random() * 2, py = fill[j+1] + Math.random() * 2;
+      // gaussian scatter blurs the boundary; a sparse wide halo lets the
+      // figure dissolve into the surrounding dark instead of ending hard
+      const spread = Math.random() < 0.1 ? 0.4 : 0.04;
+      pos[i3]   = (px - CX) * S + OX + gauss() * spread;
+      pos[i3+1] = (CY - py) * S + OY + gauss() * spread;
+      pos[i3+2] = gauss() * (0.18 + spread);
       const t = THREE.MathUtils.clamp((py - 60) / 360, 0, 1); // hair → face gradient
-      c.copy(SILVER).lerp(GOLD, 0.15 + t * 0.8);
-      if (useEdge) c.lerp(GOLD_CORE, 0.35); else c.multiplyScalar(0.75);
+      c.copy(SILVER).lerp(GOLD, 0.15 + t * 0.8)
+        .multiplyScalar(0.5 + Math.random() * 0.6); // sparkle variance
       col[i3] = c.r; col[i3+1] = c.g; col[i3+2] = c.b;
     }
     return { pos, col };
@@ -570,7 +570,7 @@ if (renderer) {
     uM2:   { value: 0 },   // galaxy → face
     uTime: { value: 0 },
     uSize: { value: isMobile ? 0.052 : 0.036 },
-    uFaceDim: { value: isMobile ? 0.2 : 0.42 },
+    uFaceDim: { value: isMobile ? 0.3 : 0.55 },
     uProj: { value: 1 }    // projection scale, set in resize()
   };
   const material = new THREE.ShaderMaterial({
@@ -587,9 +587,12 @@ if (renderer) {
         float m1 = smoothstep(0., 1., clamp(uM1 * 1.35 - aRand * .35, 0., 1.));
         float m2 = smoothstep(0., 1., clamp(uM2 * 1.35 - aRand * .35, 0., 1.));
         vec3 p = mix(mix(position, aGalaxy, m1), aFace, m2);
-        p += 0.02 * vec3(sin(uTime * .6 + aRand * 17.),
-                         cos(uTime * .5 + aRand * 23.),
-                         sin(uTime * .7 + aRand * 29.));
+        // free drift: every particle wanders on its own frequency and
+        // phase, growing stronger once the figure has formed
+        float amp = mix(0.02, 0.055, m2);
+        p += amp * vec3(sin(uTime * (.5 + aRand) + aRand * 17.),
+                        cos(uTime * (.4 + aRand * .8) + aRand * 23.),
+                        sin(uTime * (.6 + aRand * .6) + aRand * 29.));
         vec4 mv = modelViewMatrix * vec4(p, 1.);
         gl_Position = projectionMatrix * mv;
         gl_PointSize = uSize * aScale * uProj / -mv.z;
